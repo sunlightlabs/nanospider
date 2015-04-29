@@ -1,5 +1,5 @@
 requests
 gevent
 scrapelib
-grequests
 lxml
+-e git+https://github.com/seomoz/url-py.git#egg=url
