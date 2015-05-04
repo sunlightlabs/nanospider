@@ -1,7 +1,7 @@
 from gevent import monkey, queue, pool, spawn
 monkey.patch_all()
 
-import requests, traceback, sqlite3, itertools
+import requests, traceback, sqlite3, itertools, urlparse
 import url as moz_url
 from lxml import etree
 
@@ -74,8 +74,9 @@ class Spider(object):
 
             links = parsed.xpath("//a[@href]")
             for link in links:
-                new_link = url.relative(link.attrib['href'])
+                new_link = moz_url.parse(urlparse.urljoin(url.utf8(), link.attrib['href']))
                 new_link._fragment = None
+                new_link._userinfo = None
                 self._add_to_queue(new_link.canonical())
 
         # mark this one as processed
@@ -116,5 +117,5 @@ class Spider(object):
 
 if __name__ == "__main__":
     import sys
-    s = Spider(sys.argv[1], sys.argv[1] + ".db", workers=4)
+    s = Spider(sys.argv[1], sys.argv[1] + ".db", workers=4, retry_attempts=2)
     s.crawl()
