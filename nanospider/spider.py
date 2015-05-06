@@ -37,9 +37,6 @@ class Spider(object):
 
         self._scraper = SpiderScraper(cache_path, self._allowed_hosts, **kwargs)
         self._build_table()
-        self._resume_queue()
-
-        self._add_to_queue(moz_url.parse("http://%s/" % domain))
 
     def _build_table(self):
         self._scraper.cache_storage._conn.execute("""CREATE TABLE IF NOT EXISTS seen
@@ -94,6 +91,9 @@ class Spider(object):
                 self._queue.task_done()
 
     def crawl(self):
+        self._resume_queue()
+        self._add_to_queue(moz_url.parse("http://%s/" % domain))
+        
         for i in range(self._worker_count):
             self._workers.append(spawn(self._crawl_worker))
         self._queue.join()
