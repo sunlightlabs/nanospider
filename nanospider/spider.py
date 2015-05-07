@@ -1,5 +1,4 @@
-from gevent import monkey, queue, pool, spawn
-monkey.patch_all()
+from gevent import queue, pool, spawn
 
 import requests, traceback, sqlite3, itertools, urlparse
 import url as moz_url
@@ -18,7 +17,11 @@ class SpiderScraper(Scraper):
 
         self.cache_storage = SQLiteCache(cache_path)
         self.cache_write_only = False
-        self._allowed_hosts = set(allowed_hosts)
+
+        if type(allowed_hosts) is set:
+            self._allowed_hosts = allowed_hosts
+        else:
+            self._allowed_hosts = set(allowed_hosts)
 
     def should_cache_response(self, response):
         return response.status_code == 200 and \
@@ -91,9 +94,25 @@ class Spider(object):
                 self._queue.task_done()
 
     def crawl(self):
+        from gevent.monkey import saved
+        if 'socket' not in saved:
+            # we're not gevent-monkey-patched
+            raise RuntimeError("Spider.crawl() needs gevent monkey patching to have been applied")
+
         self._resume_queue()
-        self._add_to_queue(moz_url.parse("http://%s/" % domain))
-        
+
+        if len(list(self._scraper.cache_storage._conn.execute("SELECT * FROM seen LIMIT 1"))) == 0 and self._queue.qsize() == 0:
+            # we're at the beginning, so start with the home page
+            # follow any homepage redirects, so we get the right protocol and domain
+            tmp_response = requests.get("http://%s/" % self.domain)
+
+            first_url = moz_url.parse(tmp_response.url)
+            if first_url._host not in self._allowed_hosts:
+                self._allowed_hosts.add(first_url._host)
+
+            self._add_to_queue(first_url)
+
+
         for i in range(self._worker_count):
             self._workers.append(spawn(self._crawl_worker))
         self._queue.join()
@@ -114,8 +133,3 @@ class Spider(object):
     # proxy the scraper's get for convenience
     def get(self, *args, **kwargs):
         return self._scraper.get(*args, **kwargs)
-
-if __name__ == "__main__":
-    import sys
-    s = Spider(sys.argv[1], sys.argv[1] + ".db", workers=4, retry_attempts=2)
-    s.crawl()
