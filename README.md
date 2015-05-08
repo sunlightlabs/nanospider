@@ -1,0 +1,2 @@
+# nanospider
+nanospider is a tiny, mediocre webspider built on gevent, lxml, and Sunlight's own scrapelib, in support of the Invisible Influence project. Not guaranteed to be useful for anything in particular.
