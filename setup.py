@@ -29,9 +29,9 @@ setup(
         "gevent",
         "scrapelib",
         "lxml",
-        "url>=0.1.2dev",
+        "url>=0.1.3",
     ],
     dependency_links=[
-        "git+https://github.com/seomoz/url-py.git#egg=url-0.1.2dev",
+        "git+https://github.com/seomoz/url-py.git#egg=url-0.1.3",
     ],
 )
