@@ -29,9 +29,12 @@ class SpiderScraper(Scraper):
             is_html(response)
 
 class Spider(object):
+    crawl_requires_gevent = True
+    queue_class = queue.JoinableQueue
+
     def __init__(self, domain, cache_path, workers=2, try_sitemap=True, **kwargs):
         self.domain = domain
-        self._queue = queue.JoinableQueue()
+        self._queue = self.queue_class.im_func() if hasattr(self.queue_class, 'im_func') else self.queue_class()
         self._workers = []
         self._worker_count = workers
         self._allowed_hosts = set()
@@ -93,15 +96,16 @@ class Spider(object):
             finally:
                 self._queue.task_done()
 
-    def crawl(self):
-        from gevent.monkey import saved
-        if 'socket' not in saved:
-            # we're not gevent-monkey-patched
-            raise RuntimeError("Spider.crawl() needs gevent monkey patching to have been applied")
+    def _initialize_crawl(self):
+        if self.crawl_requires_gevent:
+            from gevent.monkey import saved
+            if 'socket' not in saved:
+                # we're not gevent-monkey-patched
+                raise RuntimeError("Spider.crawl() needs gevent monkey patching to have been applied")
 
         self._resume_queue()
 
-        if len(list(self._scraper.cache_storage._conn.execute("SELECT * FROM seen LIMIT 1"))) == 0 and self._queue.qsize() == 0:
+        if len(list(self._scraper.cache_storage._conn.execute("SELECT * FROM seen LIMIT 1"))) == 0 and self._queue.empty():
             # we're at the beginning, so start with the home page
             # follow any homepage redirects, so we get the right protocol and domain
             tmp_response = requests.get("http://%s/" % self.domain)
@@ -112,6 +116,8 @@ class Spider(object):
 
             self._add_to_queue(first_url)
 
+    def crawl(self):
+        self._initialize_crawl()
 
         for i in range(self._worker_count):
             self._workers.append(spawn(self._crawl_worker))
